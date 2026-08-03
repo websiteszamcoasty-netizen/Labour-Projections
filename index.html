@@ -101,10 +101,8 @@
   .totals-bar .stat .label{font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#5A6B7C;font-weight:600;}
   .totals-bar .stat .value{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:var(--navy);}
   .totals-bar .stat .value.money{color:var(--green);}
-  .export-panel{display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:space-between;}
-  .export-note{font-size:12.5px;color:#5A6B7C;line-height:1.55;max-width:620px;}
-  .export-note code{background:#F4F7FA;padding:1px 5px;border-radius:3px;font-family:'IBM Plex Mono',monospace;}
-  .export-buttons{display:flex;gap:10px;flex-wrap:wrap;}
+  .export-panel{display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:center;}
+  .export-buttons{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;}
   .toast{position:fixed;bottom:24px;right:24px;background:var(--navy);color:#fff;padding:14px 20px;border-radius:6px;font-size:13.5px;box-shadow:0 6px 20px rgba(0,0,0,0.25);border-left:4px solid var(--orange);max-width:340px;opacity:0;transform:translateY(10px);transition:all 0.25s ease;pointer-events:none;z-index:50;}
   .toast.show{opacity:1;transform:translateY(0);}
   #otherTypeField{display:none;}
@@ -250,10 +248,6 @@
   <div class="panel">
     <h2>Generate Report</h2>
     <div class="export-panel">
-      <div class="export-note">
-        Builds one Excel workbook, formatted like the F4E payroll sheet — site name and date top-left, blue header row, shaded subtotal rows, orange grand-total row — with one sheet per site (Food for Education's 4 sub-sites are combined into a single sheet, like the sample) plus a Summary sheet.<br><br>
-        <strong>Email Report</strong> sends automatically to <code>jmwero@pala.co.ke</code> once EmailJS is configured (see README) — otherwise it downloads the file and opens an email draft for you to attach it and send. <strong>Send via WhatsApp</strong> downloads the file and opens a pre-filled draft to <code>+254 745 553 496</code> — WhatsApp doesn't allow websites to attach files or hit send on your behalf, so you'll attach the downloaded file and tap send yourself.
-      </div>
       <div class="export-buttons">
         <button class="btn btn-outline" onclick="exportExcel('download')">Download Excel</button>
         <button class="btn btn-primary" onclick="exportExcel('email')">Email Report</button>
@@ -572,7 +566,18 @@
 
     const buffer = await workbook.xlsx.writeBuffer();
     const filename = `Labour_Projection_${dateStr}.xlsx`;
-    return {buffer, filename, dateStr, label, summaryEntries};
+    const base64 = arrayBufferToBase64(buffer);
+    return {buffer, base64, filename, dateStr, label, summaryEntries};
+  }
+
+  function arrayBufferToBase64(buffer){
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    const chunkSize = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+    }
+    return btoa(binary);
   }
 
   function downloadBuffer(buffer, filename){
@@ -596,10 +601,11 @@
     window.location.href = `mailto:${RECIPIENT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   }
 
-  function sendEmailAuto(subject, message){
+  function sendEmailAuto(subject, message, base64, filename){
     if (!(EMAILJS_PUBLIC_KEY && EMAILJS_SERVICE_ID && EMAILJS_TEMPLATE_ID) || !window.emailjs) return false;
-    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {subject, message, to_email:RECIPIENT_EMAIL})
-      .then(() => showToast(`Report emailed automatically to ${RECIPIENT_EMAIL}.`))
+    const attachmentDataUrl = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${base64}`;
+    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {subject, message, to_email:RECIPIENT_EMAIL, attachment:attachmentDataUrl, filename})
+      .then(() => showToast(`Report emailed automatically to ${RECIPIENT_EMAIL}, Excel file attached.`))
       .catch(err => { console.error(err); showToast('Auto-email failed — opening a draft instead.'); openMailtoFallback(subject, message); });
     return true;
   }
@@ -607,7 +613,7 @@
   async function exportExcel(mode){
     const result = await generateWorkbook();
     if (!result) { showToast('Add at least one worker before generating a report.'); return; }
-    const {buffer, filename, dateStr, label, summaryEntries} = result;
+    const {buffer, base64, filename, dateStr, label, summaryEntries} = result;
     downloadBuffer(buffer, filename);
 
     if (mode === 'download') { showToast('Excel report downloaded.'); return; }
@@ -617,15 +623,15 @@
 
     if (mode === 'email') {
       const noteForDraft = `${summaryText}\n\n(The full file "${filename}" was just downloaded — attach it here before sending.)`;
-      const sentAuto = sendEmailAuto(subject, noteForDraft);
+      const sentAuto = sendEmailAuto(subject, noteForDraft, base64, filename);
       if (!sentAuto) {
         openMailtoFallback(subject, noteForDraft);
-        showToast('Excel downloaded. Draft email opened — attach the file, or set up EmailJS (see README) for one-click auto-send.');
+        showToast('Excel downloaded. Draft email opened — attach the file, or set up EmailJS (see README) for one-click auto-send with the file attached.');
       }
     } else if (mode === 'whatsapp') {
       const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(summaryText)}`;
       window.open(url, '_blank');
-      showToast('Excel downloaded. WhatsApp draft opened — attach the file if needed, then tap send.');
+      showToast('Excel downloaded. WhatsApp draft opened — attach the file, then tap send.');
     }
   }
 
