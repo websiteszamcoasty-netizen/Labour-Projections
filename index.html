@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Labour Projection Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/emailjs-com/3.2.0/email.min.js"></script>
+<style>
+  :root{
+    --navy:#0F2A43;
+    --blueline:#2E5C8A;
+    --paper:#EEF3F7;
+    --card:#FFFFFF;
+    --ink:#1C2733;
+    --orange:#E2601C;
+    --orange-dark:#B84A12;
+    --green:#2F7D53;
+    --grid:#D7E2EC;
+    --border:#C9D6E2;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size:28px 28px;
+    font-family:'Inter',sans-serif;
+    color:var(--ink);
+    min-height:100vh;
+  }
+  header{
+    background:var(--navy);
+    color:#fff;
+    padding:28px 32px 24px;
+    position:relative;
+    border-bottom:4px solid var(--orange);
+    overflow:hidden;
+  }
+  header::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+    background-size:24px 24px;
+    pointer-events:none;
+  }
+  .corner{position:absolute;width:14px;height:14px;border:2px solid var(--orange);opacity:0.9;}
+  .corner.tl{top:10px;left:10px;border-right:none;border-bottom:none;}
+  .corner.tr{top:10px;right:10px;border-left:none;border-bottom:none;}
+  .corner.bl{bottom:10px;left:10px;border-right:none;border-top:none;}
+  .corner.br{bottom:10px;right:10px;border-left:none;border-top:none;}
+  header h1{font-family:'Space Grotesk',sans-serif;font-size:26px;margin:0 0 4px;letter-spacing:0.3px;position:relative;}
+  header p{margin:0;font-size:13px;color:#B9CCE0;font-family:'IBM Plex Mono',monospace;position:relative;}
+  main{max-width:1240px;margin:0 auto;padding:24px 20px 60px;}
+  .panel{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:20px 22px;margin-bottom:20px;box-shadow:0 1px 3px rgba(15,42,67,0.06);}
+  .panel h2{font-family:'Space Grotesk',sans-serif;font-size:15px;text-transform:uppercase;letter-spacing:0.8px;color:var(--navy);margin:0 0 16px;display:flex;align-items:center;gap:8px;}
+  .panel h2::before{content:"";width:8px;height:8px;background:var(--orange);display:inline-block;transform:rotate(45deg);}
+  label{display:block;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;color:#4B5C6E;margin-bottom:5px;}
+  select, input{width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:4px;font-size:14px;font-family:'Inter',sans-serif;background:#fff;color:var(--ink);}
+  input[data-mono="1"], .mono{font-family:'IBM Plex Mono',monospace;}
+  select:focus, input:focus{outline:2px solid var(--blueline);outline-offset:1px;}
+  .row{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;}
+  .row .field{flex:1;min-width:200px;}
+  .site-badge{background:var(--navy);color:#fff;font-family:'IBM Plex Mono',monospace;font-size:12px;padding:8px 14px;border-radius:4px;white-space:nowrap;}
+  .grid-form{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+  .grid-form .field.span2{grid-column:span 2;}
+  .grid-form .field.span4{grid-column:span 4;}
+  @media (max-width:800px){
+    .grid-form{grid-template-columns:repeat(2,1fr);}
+    .grid-form .field.span2, .grid-form .field.span4{grid-column:span 2;}
+  }
+  .computed{background:#F4F7FA;border:1px dashed var(--border);border-radius:4px;padding:8px 10px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--navy);}
+  .btn{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:13.5px;letter-spacing:0.3px;padding:11px 20px;border:none;border-radius:4px;cursor:pointer;text-transform:uppercase;transition:transform 0.06s ease, box-shadow 0.15s ease;}
+  .btn:active{transform:translateY(1px);}
+  .btn-primary{background:var(--orange);color:#fff;}
+  .btn-primary:hover{background:var(--orange-dark);}
+  .btn-outline{background:transparent;color:var(--navy);border:1.5px solid var(--navy);}
+  .btn-outline:hover{background:var(--navy);color:#fff;}
+  .btn-whatsapp{background:#25D366;color:#fff;}
+  .btn-whatsapp:hover{background:#1DA851;}
+  .btn-danger{background:transparent;color:#B23A3A;border:1px solid #E3B4B4;padding:5px 9px;font-size:11px;text-transform:none;}
+  .btn-danger:hover{background:#B23A3A;color:#fff;}
+  .form-actions{margin-top:16px;display:flex;gap:12px;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:6px;}
+  th{background:var(--navy);color:#fff;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:0.3px;padding:10px 7px;text-align:left;white-space:nowrap;}
+  td{padding:7px;border-bottom:1px solid var(--border);white-space:nowrap;font-family:'IBM Plex Mono',monospace;}
+  td.name-cell{font-family:'Inter',sans-serif;font-weight:500;}
+  tr:nth-child(even) td{background:#F7FAFC;}
+  tr:hover td{background:#EEF4FA;}
+  .empty-row td{text-align:center;color:#8A99A8;font-family:'Inter',sans-serif;padding:26px;}
+  .totals-bar{display:flex;justify-content:flex-end;gap:28px;margin-top:14px;flex-wrap:wrap;}
+  .totals-bar .stat{text-align:right;}
+  .totals-bar .stat .label{font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#5A6B7C;font-weight:600;}
+  .totals-bar .stat .value{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:var(--navy);}
+  .totals-bar .stat .value.money{color:var(--green);}
+  .export-panel{display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:space-between;}
+  .export-note{font-size:12.5px;color:#5A6B7C;line-height:1.55;max-width:620px;}
+  .export-note code{background:#F4F7FA;padding:1px 5px;border-radius:3px;font-family:'IBM Plex Mono',monospace;}
+  .export-buttons{display:flex;gap:10px;flex-wrap:wrap;}
+  .toast{position:fixed;bottom:24px;right:24px;background:var(--navy);color:#fff;padding:14px 20px;border-radius:6px;font-size:13.5px;box-shadow:0 6px 20px rgba(0,0,0,0.25);border-left:4px solid var(--orange);max-width:340px;opacity:0;transform:translateY(10px);transition:all 0.25s ease;pointer-events:none;z-index:50;}
+  .toast.show{opacity:1;transform:translateY(0);}
+  #otherTypeField{display:none;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
+  <h1>Labour Projection Tracker</h1>
+  <p>SITE LABOUR &amp; WAGE PLANNING — Food for Education · Highlands · Kigumo · Mai Mahiu · Migaa · MUA</p>
+</header>
+
+<main>
+
+  <!-- SITE + REPORT SETTINGS -->
+  <div class="panel">
+    <h2>Site &amp; Report Settings</h2>
+    <div class="row">
+      <div class="field">
+        <label for="siteSelect">Project Site</label>
+        <select id="siteSelect"></select>
+      </div>
+      <div class="field">
+        <label for="reportDate">Report Date</label>
+        <input type="date" id="reportDate" data-mono="1">
+      </div>
+      <div class="field">
+        <label for="reportLabel">Report Label</label>
+        <input type="text" id="reportLabel" value="PAYROLL">
+      </div>
+      <div class="site-badge" id="siteBadge">0 workers logged</div>
+    </div>
+  </div>
+
+  <!-- ADD WORKER FORM -->
+  <div class="panel">
+    <h2>Add Worker</h2>
+    <div class="grid-form">
+      <div class="field">
+        <label for="wName">Worker Name</label>
+        <input type="text" id="wName" placeholder="Full name">
+      </div>
+      <div class="field">
+        <label for="wType">Worker Type</label>
+        <select id="wType">
+          <option>Foreman</option><option>Carpenter</option><option>Mason</option>
+          <option>Steel Fixer</option><option>Electrician</option><option>Plumber</option>
+          <option>Casual</option><option>Storekeeper</option>
+          <option value="Other">Other (specify)</option>
+        </select>
+      </div>
+      <div class="field" id="otherTypeField">
+        <label for="wTypeOther">Specify Type</label>
+        <input type="text" id="wTypeOther" placeholder="e.g. Welder">
+      </div>
+      <div class="field">
+        <label for="wId">ID Number</label>
+        <input type="text" id="wId" data-mono="1" placeholder="National ID">
+      </div>
+      <div class="field">
+        <label for="wPhone">Phone Number</label>
+        <input type="text" id="wPhone" data-mono="1" placeholder="07XXXXXXXX">
+      </div>
+
+      <div class="field span2">
+        <label for="wTask">Item on BQ (Task)</label>
+        <input type="text" id="wTask" placeholder="e.g. Plaster Works">
+      </div>
+      <div class="field">
+        <label for="wUnit">Unit of Measurement</label>
+        <input type="text" id="wUnit" placeholder="e.g. SM, No., Item">
+      </div>
+      <div class="field">
+        <label for="wBqQty">Qty in BQ</label>
+        <input type="number" id="wBqQty" data-mono="1" min="0" step="0.01" placeholder="0">
+      </div>
+      <div class="field span2">
+        <label for="wAntQty">Qty to be Done (this duration)</label>
+        <input type="number" id="wAntQty" data-mono="1" min="0" step="0.01" placeholder="0">
+      </div>
+
+      <div class="field">
+        <label for="wWage">Rate / Day (KES)</label>
+        <input type="number" id="wWage" data-mono="1" min="0" step="0.01" placeholder="0.00">
+      </div>
+      <div class="field">
+        <label>Extra Hour Rate (auto)</label>
+        <div class="computed" id="extraRateDisplay">Rate ÷ 8 = 0.00</div>
+      </div>
+      <div class="field">
+        <label for="wDays">Days Worked</label>
+        <input type="number" id="wDays" data-mono="1" min="0" step="0.5" placeholder="0">
+      </div>
+      <div class="field">
+        <label for="wExtraHrs">OT Hours</label>
+        <input type="number" id="wExtraHrs" data-mono="1" min="0" step="0.5" placeholder="0">
+      </div>
+
+      <div class="field">
+        <label>Amount (auto)</label>
+        <div class="computed" id="amountDisplay">KES 0.00</div>
+      </div>
+      <div class="field">
+        <label>OT Amount (auto)</label>
+        <div class="computed" id="otAmountDisplay">KES 0.00</div>
+      </div>
+      <div class="field span2">
+        <label>Projected Total (auto)</label>
+        <div class="computed" id="totalWageDisplay">KES 0.00</div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="addWorker()">+ Add Worker to Site</button>
+      <button class="btn btn-outline" onclick="clearForm()">Clear Form</button>
+    </div>
+  </div>
+
+  <!-- WORKER TABLE -->
+  <div class="panel">
+    <h2>Workers Logged — <span id="siteNameLabel"></span></h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th><th>Name</th><th>ID No.</th><th>Phone</th><th>Item on BQ</th>
+            <th>Qty in BQ</th><th>Unit</th><th>Qty to be Done</th><th>Type</th>
+            <th>Days</th><th>Rate</th><th>Extra Hr Rate</th><th>Amount</th>
+            <th>OT Hrs</th><th>OT Amount</th><th>Total</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="workerTableBody"></tbody>
+      </table>
+    </div>
+    <div class="totals-bar">
+      <div class="stat"><div class="label">Workers on Site</div><div class="value" id="siteWorkerCount">0</div></div>
+      <div class="stat"><div class="label">Total Wage Bill</div><div class="value money" id="siteWageTotal">KES 0.00</div></div>
+    </div>
+  </div>
+
+  <!-- EXPORT -->
+  <div class="panel">
+    <h2>Generate Report</h2>
+    <div class="export-panel">
+      <div class="export-note">
+        Builds one Excel workbook, formatted like the F4E payroll sheet — site name and date top-left, blue header row, shaded subtotal rows, orange grand-total row — with one sheet per site (Food for Education's 4 sub-sites are combined into a single sheet, like the sample) plus a Summary sheet.<br><br>
+        <strong>Email Report</strong> sends automatically to <code>jmwero@pala.co.ke</code> once EmailJS is configured (see README) — otherwise it downloads the file and opens an email draft for you to attach it and send. <strong>Send via WhatsApp</strong> downloads the file and opens a pre-filled draft to <code>+254 745 553 496</code> — WhatsApp doesn't allow websites to attach files or hit send on your behalf, so you'll attach the downloaded file and tap send yourself.
+      </div>
+      <div class="export-buttons">
+        <button class="btn btn-outline" onclick="exportExcel('download')">Download Excel</button>
+        <button class="btn btn-primary" onclick="exportExcel('email')">Email Report</button>
+        <button class="btn btn-whatsapp" onclick="exportExcel('whatsapp')">Send via WhatsApp</button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ── EmailJS config — fill these in from your emailjs.com dashboard to enable
+  // fully automatic email sending. Leave blank to fall back to a manual draft. ──
+  const EMAILJS_PUBLIC_KEY  = '';
+  const EMAILJS_SERVICE_ID  = '';
+  const EMAILJS_TEMPLATE_ID = '';
+  if (EMAILJS_PUBLIC_KEY && window.emailjs) { emailjs.init(EMAILJS_PUBLIC_KEY); }
+
+  const RECIPIENT_EMAIL = 'jmwero@pala.co.ke';
+  const WHATSAPP_NUMBER = '254745553496'; // +254 745 553 496, no plus/spaces for wa.me
+
+  const SITES = [
+    {group:"Food for Education", name:"Miagayuini Primary"},
+    {group:"Food for Education", name:"Ihururu Primary"},
+    {group:"Food for Education", name:"Kiriti Secondary"},
+    {group:"Food for Education", name:"Mathakwaini Primary"},
+    {group:null, name:"Highlands"},
+    {group:null, name:"Kigumo"},
+    {group:null, name:"Mai Mahiu"},
+    {group:null, name:"Migaa"},
+    {group:null, name:"MUA"},
+  ];
+
+  const siteData = {};
+  SITES.forEach(s => siteData[s.name] = []);
+  let currentSite = SITES[0].name;
+
+  const siteSelect = document.getElementById('siteSelect');
+  const groups = {};
+  SITES.forEach(s => {
+    if (s.group) {
+      if (!groups[s.group]) {
+        groups[s.group] = document.createElement('optgroup');
+        groups[s.group].label = s.group;
+        siteSelect.appendChild(groups[s.group]);
+      }
+      const opt = document.createElement('option');
+      opt.value = s.name; opt.textContent = s.name;
+      groups[s.group].appendChild(opt);
+    } else {
+      const opt = document.createElement('option');
+      opt.value = s.name; opt.textContent = s.name;
+      siteSelect.appendChild(opt);
+    }
+  });
+  siteSelect.value = currentSite;
+  siteSelect.addEventListener('change', () => { currentSite = siteSelect.value; renderTable(); });
+
+  document.getElementById('reportDate').value = new Date().toISOString().slice(0,10);
+
+  document.getElementById('wType').addEventListener('change', (e) => {
+    document.getElementById('otherTypeField').style.display = e.target.value === 'Other' ? 'block' : 'none';
+  });
+
+  function computeLive() {
+    const wage = parseFloat(document.getElementById('wWage').value) || 0;
+    const days = parseFloat(document.getElementById('wDays').value) || 0;
+    const extraHrs = parseFloat(document.getElementById('wExtraHrs').value) || 0;
+    const extraRate = wage / 8;
+    const amount = wage * days;
+    const otAmount = extraRate * extraHrs;
+    const total = amount + otAmount;
+    document.getElementById('extraRateDisplay').textContent = `Rate ÷ 8 = ${extraRate.toFixed(2)}`;
+    document.getElementById('amountDisplay').textContent = money(amount);
+    document.getElementById('otAmountDisplay').textContent = money(otAmount);
+    document.getElementById('totalWageDisplay').textContent = money(total);
+  }
+  ['wWage','wDays','wExtraHrs'].forEach(id => document.getElementById(id).addEventListener('input', computeLive));
+
+  function addWorker() {
+    const name = document.getElementById('wName').value.trim();
+    if (!name) { showToast("Enter the worker's name first."); return; }
+
+    let type = document.getElementById('wType').value;
+    if (type === 'Other') { type = document.getElementById('wTypeOther').value.trim() || 'Other'; }
+
+    const wage = parseFloat(document.getElementById('wWage').value) || 0;
+    const days = parseFloat(document.getElementById('wDays').value) || 0;
+    const extraHrs = parseFloat(document.getElementById('wExtraHrs').value) || 0;
+    const extraRate = wage / 8;
+    const amount = wage * days;
+    const otAmount = extraRate * extraHrs;
+    const total = amount + otAmount;
+
+    siteData[currentSite].push({
+      name, type,
+      idNo: document.getElementById('wId').value.trim(),
+      phone: document.getElementById('wPhone').value.trim(),
+      task: document.getElementById('wTask').value.trim(),
+      unit: document.getElementById('wUnit').value.trim(),
+      bqQty: parseFloat(document.getElementById('wBqQty').value) || 0,
+      antQty: parseFloat(document.getElementById('wAntQty').value) || 0,
+      wage, extraRate, days, extraHrs, amount, otAmount, total,
+    });
+
+    renderTable();
+    clearForm();
+    showToast(`${name} added to ${currentSite}.`);
+  }
+
+  function clearForm() {
+    ['wName','wId','wPhone','wWage','wDays','wExtraHrs','wTask','wUnit','wBqQty','wAntQty','wTypeOther'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('wType').value = 'Foreman';
+    document.getElementById('otherTypeField').style.display = 'none';
+    computeLive();
+    document.getElementById('wName').focus();
+  }
+
+  function deleteWorker(idx) { siteData[currentSite].splice(idx, 1); renderTable(); }
+
+  function money(n){ return `KES ${n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`; }
+  function escapeHtml(str){ if (!str) return ''; return str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+  function renderTable() {
+    document.getElementById('siteNameLabel').textContent = currentSite;
+    const workers = siteData[currentSite];
+    const tbody = document.getElementById('workerTableBody');
+    tbody.innerHTML = '';
+
+    if (workers.length === 0) {
+      tbody.innerHTML = `<tr class="empty-row"><td colspan="17">No workers logged for ${currentSite} yet.</td></tr>`;
+    } else {
+      workers.forEach((w, i) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${i+1}</td>
+          <td class="name-cell">${escapeHtml(w.name)}</td>
+          <td>${escapeHtml(w.idNo)}</td>
+          <td>${escapeHtml(w.phone)}</td>
+          <td>${escapeHtml(w.task)}</td>
+          <td>${w.bqQty}</td>
+          <td>${escapeHtml(w.unit)}</td>
+          <td>${w.antQty}</td>
+          <td>${escapeHtml(w.type)}</td>
+          <td>${w.days}</td>
+          <td>${w.wage.toFixed(2)}</td>
+          <td>${w.extraRate.toFixed(2)}</td>
+          <td>${w.amount.toFixed(2)}</td>
+          <td>${w.extraHrs}</td>
+          <td>${w.otAmount.toFixed(2)}</td>
+          <td>${w.total.toFixed(2)}</td>
+          <td><button class="btn-danger" onclick="deleteWorker(${i})">Remove</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    document.getElementById('siteBadge').textContent = `${workers.length} worker${workers.length===1?'':'s'} logged`;
+    document.getElementById('siteWorkerCount').textContent = workers.length;
+    document.getElementById('siteWageTotal').textContent = money(workers.reduce((sum,w) => sum + w.total, 0));
+  }
+
+  // ─────────────────────────── Excel workbook (ExcelJS) ───────────────────────────
+  const HEADERS = ["#","Name","ID No.","Phone","Item on BQ","Qty in BQ","Unit","Qty to be Done","Type","Days","Rate","Extra Hr Rate","Amount","OT Hours","OT Amount","Total"];
+  const COL_WIDTHS = [4,20,14,14,26,10,8,13,12,7,10,12,12,9,12,12];
+  const LAST_COL = 'P';
+  const THIN_BORDER = {top:{style:'thin',color:{argb:'FFBFBFBF'}},left:{style:'thin',color:{argb:'FFBFBFBF'}},bottom:{style:'thin',color:{argb:'FFBFBFBF'}},right:{style:'thin',color:{argb:'FFBFBFBF'}}};
+
+  function addTitleRow(ws, text){
+    const row = ws.addRow([text]);
+    ws.mergeCells(`A${row.number}:${LAST_COL}${row.number}`);
+    row.getCell(1).font = {bold:true, size:14, color:{argb:'FF1F3864'}};
+    row.getCell(1).alignment = {horizontal:'left'};
+    return row;
+  }
+  function addHeaderRow(ws){
+    const row = ws.addRow(HEADERS);
+    row.eachCell(cell => {
+      cell.font = {bold:true, size:10.5, color:{argb:'FFFFFFFF'}};
+      cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF4472C4'}};
+      cell.alignment = {horizontal:'center', vertical:'middle', wrapText:true};
+      cell.border = THIN_BORDER;
+    });
+    return row;
+  }
+  function addBlockLabelRow(ws, text){
+    const row = ws.addRow([text]);
+    ws.mergeCells(`A${row.number}:${LAST_COL}${row.number}`);
+    const cell = row.getCell(1);
+    cell.font = {bold:true, size:12, color:{argb:'FF1F3864'}};
+    cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FFD9D9D9'}};
+    cell.alignment = {horizontal:'left'};
+    return row;
+  }
+  function addWorkerRow(ws, w, idx){
+    const row = ws.addRow([idx, w.name, w.idNo, w.phone, w.task, w.bqQty, w.unit, w.antQty, w.type, w.days, w.wage, Number(w.extraRate.toFixed(2)), Number(w.amount.toFixed(2)), w.extraHrs, Number(w.otAmount.toFixed(2)), Number(w.total.toFixed(2))]);
+    row.eachCell(cell => { cell.border = THIN_BORDER; cell.font = {size:10}; });
+    return row;
+  }
+  function addSubtotalRow(ws, amountSum, otSum, totalSum){
+    const row = ws.addRow(new Array(16).fill(''));
+    ws.mergeCells(`A${row.number}:L${row.number}`);
+    row.getCell(1).value = 'Subtotal';
+    row.getCell(13).value = Number(amountSum.toFixed(2));
+    row.getCell(15).value = Number(otSum.toFixed(2));
+    row.getCell(16).value = Number(totalSum.toFixed(2));
+    row.eachCell({includeEmpty:true}, cell => {
+      cell.font = {bold:true, size:10.5};
+      cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FFF2F2F2'}};
+      cell.border = THIN_BORDER;
+    });
+    return row;
+  }
+  function addTotalRow(ws, label, totalSum, fillColor, fontColor){
+    const row = ws.addRow(new Array(16).fill(''));
+    ws.mergeCells(`A${row.number}:L${row.number}`);
+    row.getCell(1).value = label;
+    row.getCell(16).value = Number(totalSum.toFixed(2));
+    row.eachCell({includeEmpty:true}, cell => {
+      cell.font = {bold:true, size:11, color:{argb:fontColor}};
+      cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:fillColor}};
+      cell.border = THIN_BORDER;
+    });
+    return row;
+  }
+
+  function buildSiteSheet(workbook, siteName, workers, dateStr, label){
+    const ws = workbook.addWorksheet(siteName.substring(0,31).replace(/[\\\/\?\*\[\]]/g,'-'));
+    ws.columns = COL_WIDTHS.map(w => ({width:w}));
+    addTitleRow(ws, `${siteName.toUpperCase()} - ${dateStr} - ${label}`);
+    ws.addRow([]);
+    addHeaderRow(ws);
+    let amountSum=0, otSum=0, totalSum=0;
+    workers.forEach((w,i) => { addWorkerRow(ws, w, i+1); amountSum+=w.amount; otSum+=w.otAmount; totalSum+=w.total; });
+    addSubtotalRow(ws, amountSum, otSum, totalSum);
+    addTotalRow(ws, 'TOTAL', totalSum, 'FFE2601C', 'FFFFFFFF');
+    return totalSum;
+  }
+
+  function buildF4ESheet(workbook, subsites, dateStr, label){
+    const ws = workbook.addWorksheet('Food for Education');
+    ws.columns = COL_WIDTHS.map(w => ({width:w}));
+    addTitleRow(ws, `FOOD FOR EDUCATION - ${dateStr} - ${label}`);
+    ws.addRow([]);
+    addHeaderRow(ws);
+    let grandAmount=0, grandOt=0, grandTotal=0;
+    subsites.forEach(sub => {
+      addBlockLabelRow(ws, sub.name);
+      let amountSum=0, otSum=0, totalSum=0;
+      sub.workers.forEach((w,i) => { addWorkerRow(ws, w, i+1); amountSum+=w.amount; otSum+=w.otAmount; totalSum+=w.total; });
+      addSubtotalRow(ws, amountSum, otSum, totalSum);
+      addTotalRow(ws, `${sub.name.toUpperCase()} TOTAL`, totalSum, 'FFD9D9D9', 'FF1F3864');
+      grandAmount += amountSum; grandOt += otSum; grandTotal += totalSum;
+    });
+    addSubtotalRow(ws, grandAmount, grandOt, grandTotal);
+    addTotalRow(ws, 'GRAND TOTAL', grandTotal, 'FFE2601C', 'FFFFFFFF');
+    return grandTotal;
+  }
+
+  function buildSummarySheet(workbook, entries, dateStr, label){
+    const ws = workbook.addWorksheet('Summary');
+    ws.columns = [{width:28},{width:12},{width:20}];
+    const titleRow = ws.addRow([`LABOUR PROJECTION - ${dateStr} - ${label}`]);
+    ws.mergeCells(`A${titleRow.number}:C${titleRow.number}`);
+    titleRow.getCell(1).font = {bold:true, size:14, color:{argb:'FF1F3864'}};
+    ws.addRow([]);
+    const headerRow = ws.addRow(['Site / Project', 'Workers', 'Total Wage Bill (KES)']);
+    headerRow.eachCell(cell => {
+      cell.font = {bold:true, color:{argb:'FFFFFFFF'}};
+      cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF4472C4'}};
+      cell.border = THIN_BORDER;
+    });
+    let grandTotal = 0, grandWorkers = 0;
+    entries.forEach(e => {
+      const row = ws.addRow([e.name, e.workers, Number(e.total.toFixed(2))]);
+      row.eachCell(cell => cell.border = THIN_BORDER);
+      grandTotal += e.total; grandWorkers += e.workers;
+    });
+    const totalRow = ws.addRow(['GRAND TOTAL', grandWorkers, Number(grandTotal.toFixed(2))]);
+    totalRow.eachCell(cell => {
+      cell.font = {bold:true, color:{argb:'FFFFFFFF'}};
+      cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FFE2601C'}};
+      cell.border = THIN_BORDER;
+    });
+  }
+
+  async function generateWorkbook(){
+    const dateStr = document.getElementById('reportDate').value || new Date().toISOString().slice(0,10);
+    const label = document.getElementById('reportLabel').value.trim() || 'PAYROLL';
+
+    const f4eSites = SITES.filter(s => s.group === 'Food for Education');
+    const f4eSubsites = f4eSites.map(s => ({name:s.name, workers:siteData[s.name]})).filter(x => x.workers.length > 0);
+    const otherSites = SITES.filter(s => !s.group).map(s => ({name:s.name, workers:siteData[s.name]})).filter(x => x.workers.length > 0);
+
+    if (f4eSubsites.length === 0 && otherSites.length === 0) return null;
+
+    const workbook = new ExcelJS.Workbook();
+    const summaryEntries = [];
+
+    if (f4eSubsites.length > 0) {
+      const total = buildF4ESheet(workbook, f4eSubsites, dateStr, label);
+      summaryEntries.push({name:'Food for Education', workers: f4eSubsites.reduce((s,x)=>s+x.workers.length,0), total});
+    }
+    otherSites.forEach(s => {
+      const total = buildSiteSheet(workbook, s.name, s.workers, dateStr, label);
+      summaryEntries.push({name:s.name, workers:s.workers.length, total});
+    });
+
+    // Build summary sheet last, then move it to the front.
+    buildSummarySheet(workbook, summaryEntries, dateStr, label);
+    const summarySheet = workbook.worksheets[workbook.worksheets.length - 1];
+    workbook.worksheets.splice(workbook.worksheets.length - 1, 1);
+    workbook.worksheets.unshift(summarySheet);
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const filename = `Labour_Projection_${dateStr}.xlsx`;
+    return {buffer, filename, dateStr, label, summaryEntries};
+  }
+
+  function downloadBuffer(buffer, filename){
+    const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function buildSummaryText(summaryEntries, dateStr, label){
+    const lines = [`${label} — ${dateStr}`, ''];
+    let grand = 0;
+    summaryEntries.forEach(e => { lines.push(`${e.name}: ${e.workers} worker(s) — ${money(e.total)}`); grand += e.total; });
+    lines.push('', `GRAND TOTAL: ${money(grand)}`);
+    return lines.join('\n');
+  }
+
+  function openMailtoFallback(subject, body){
+    window.location.href = `mailto:${RECIPIENT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  }
+
+  function sendEmailAuto(subject, message){
+    if (!(EMAILJS_PUBLIC_KEY && EMAILJS_SERVICE_ID && EMAILJS_TEMPLATE_ID) || !window.emailjs) return false;
+    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {subject, message, to_email:RECIPIENT_EMAIL})
+      .then(() => showToast(`Report emailed automatically to ${RECIPIENT_EMAIL}.`))
+      .catch(err => { console.error(err); showToast('Auto-email failed — opening a draft instead.'); openMailtoFallback(subject, message); });
+    return true;
+  }
+
+  async function exportExcel(mode){
+    const result = await generateWorkbook();
+    if (!result) { showToast('Add at least one worker before generating a report.'); return; }
+    const {buffer, filename, dateStr, label, summaryEntries} = result;
+    downloadBuffer(buffer, filename);
+
+    if (mode === 'download') { showToast('Excel report downloaded.'); return; }
+
+    const summaryText = buildSummaryText(summaryEntries, dateStr, label);
+    const subject = `${label} Report - ${dateStr}`;
+
+    if (mode === 'email') {
+      const noteForDraft = `${summaryText}\n\n(The full file "${filename}" was just downloaded — attach it here before sending.)`;
+      const sentAuto = sendEmailAuto(subject, noteForDraft);
+      if (!sentAuto) {
+        openMailtoFallback(subject, noteForDraft);
+        showToast('Excel downloaded. Draft email opened — attach the file, or set up EmailJS (see README) for one-click auto-send.');
+      }
+    } else if (mode === 'whatsapp') {
+      const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(summaryText)}`;
+      window.open(url, '_blank');
+      showToast('Excel downloaded. WhatsApp draft opened — attach the file if needed, then tap send.');
+    }
+  }
+
+  let toastTimer;
+  function showToast(msg) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 4600);
+  }
+
+  // init
+  computeLive();
+  renderTable();
+</script>
+
+</body>
+</html>
